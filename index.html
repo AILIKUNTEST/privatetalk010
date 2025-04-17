@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PrivateTalk010</title>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <script src="script.js" defer></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h2>Private Chat Terminal</h2>
+
+  <div id="setup">
+    <input type="text" id="roomId" placeholder="Room ID" />
+    <input type="password" id="roomPass" placeholder="Password" />
+    <button id="createBtn">Create Room</button>
+    <button id="joinBtn">Join Room</button>
+  </div>
+
+  <div id="chat" style="display: none;">
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Type your message..." />
+    <button id="sendBtn">Send</button>
+    <button id="exitBtn">Exit</button>
+  </div>
+</body>
+</html>
