@@ -1,8 +1,10 @@
 let peer;
 let conn;
-let isHost = false;
-let correctPass = "";
 let peerId = "";
+let isHost = false;
+let roomId = "";
+let roomPass = "";
+let connectedClients = 0;
 
 const setupDiv = document.getElementById("setup");
 const chatDiv = document.getElementById("chat");
@@ -12,8 +14,8 @@ const sendBtn = document.getElementById("sendBtn");
 const exitBtn = document.getElementById("exitBtn");
 
 document.getElementById("createBtn").onclick = () => {
-  const roomId = document.getElementById("roomId").value;
-  const roomPass = document.getElementById("roomPass").value;
+  roomId = document.getElementById("roomId").value.trim();
+  roomPass = document.getElementById("roomPass").value.trim();
 
   if (!roomId || !roomPass) {
     alert("Enter Room ID and Password");
@@ -21,56 +23,70 @@ document.getElementById("createBtn").onclick = () => {
   }
 
   isHost = true;
-  correctPass = roomPass;
   peerId = "room-" + roomId;
 
-  peer = new Peer(peerId);
+  peer = new Peer(peerId, { debug: 2 });
 
   peer.on("open", () => {
-    console.log("Host ready with ID:", peerId);
-    alert("Room created. Share ID and password with your friend.");
+    startChat(); // Host enters chat immediately
+    console.log("Host peer ready:", peerId);
   });
 
   peer.on("connection", (connection) => {
-    if (conn) {
-      connection.close(); // Only allow 1 connection
+    if (connectedClients >= 1) {
+      connection.close(); // Only 1 guest allowed
       return;
     }
 
     connection.on("data", (data) => {
       if (data.type === "auth") {
-        if (data.pass === correctPass) {
-          connection.send({ type: "auth", status: "success" });
+        if (data.pass === roomPass) {
           conn = connection;
-          startChat();
+          conn.send({ type: "auth", status: "success" });
+          connectedClients++;
         } else {
-          connection.send({ type: "auth", status: "fail" });
+          conn.send({ type: "auth", status: "fail" });
           connection.close();
         }
       } else if (data.type === "msg") {
         addMessage("Friend: " + data.text);
       }
     });
+
+    connection.on("close", () => {
+      connectedClients = 0;
+      alert("Friend disconnected.");
+      if (isHost) {
+        endSession();
+      }
+    });
+  });
+
+  peer.on("disconnected", () => {
+    connectedClients = 0;
+  });
+
+  peer.on("error", (err) => {
+    alert("Error: " + err.message);
   });
 };
 
 document.getElementById("joinBtn").onclick = () => {
-  const roomId = document.getElementById("roomId").value;
-  const roomPass = document.getElementById("roomPass").value;
+  roomId = document.getElementById("roomId").value.trim();
+  roomPass = document.getElementById("roomPass").value.trim();
 
   if (!roomId || !roomPass) {
     alert("Enter Room ID and Password");
     return;
   }
 
-  correctPass = roomPass;
-  peer = new Peer();
+  peer = new Peer(null, { debug: 2 });
 
   peer.on("open", () => {
     conn = peer.connect("room-" + roomId);
 
     conn.on("open", () => {
-      conn.send({ type: "auth", pass: correctPass });
+      conn.send({ type: "auth", pass: roomPass });
     });
 
     conn.on("data", (data) => {
@@ -85,6 +101,15 @@ document.getElementById("joinBtn").onclick = () => {
         addMessage("Friend: " + data.text);
       }
     });
+
+    conn.on("close", () => {
+      alert("Host disconnected.");
+      endSession();
+    });
+  });
+
+  peer.on("error", (err) => {
+    alert("Error: " + err.message);
   });
 };
 
@@ -100,10 +125,7 @@ sendBtn.onclick = () => {
 exitBtn.onclick = () => {
   if (conn) conn.close();
   if (peer) peer.destroy();
-  chatDiv.style.display = "none";
-  setupDiv.style.display = "block";
-  messagesDiv.innerHTML = "";
-  alert("Chat session ended.");
+  endSession();
 };
 
 function startChat() {
@@ -111,9 +133,21 @@ function startChat() {
   chatDiv.style.display = "block";
 }
 
+function endSession() {
+  setupDiv.style.display = "block";
+  chatDiv.style.display = "none";
+  messagesDiv.innerHTML = "";
+  conn = null;
+  peer = null;
+  peerId = "";
+  isHost = false;
+  connectedClients = 0;
+  console.clear(); // Remove local history
+}
+
 function addMessage(msg) {
-  const el = document.createElement("div");
-  el.textContent = msg;
-  messagesDiv.appendChild(el);
+  const div = document.createElement("div");
+  div.textContent = msg;
+  messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
